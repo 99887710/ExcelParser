@@ -1,6 +1,7 @@
 package com.poll.parser.xls;
 
 import com.poll.json.Json;
+import com.poll.json.JsonArray;
 import com.poll.parser.Parsable;
 import com.poll.parser.file.FileReadable;
 import org.apache.poi.hssf.usermodel.HSSFSheet;
@@ -14,7 +15,6 @@ import java.util.Iterator;
 public class XlsParser implements Parsable {
 
     private FileReadable fileReader;
-    private HSSFWorkbook hssfWorkbook;
     private HSSFSheet sheet;
 
     public XlsParser(FileReadable fileReader) {
@@ -23,12 +23,12 @@ public class XlsParser implements Parsable {
 
 
     public HSSFWorkbook getWorkBook(){
-        try {
-            hssfWorkbook = new HSSFWorkbook(fileReader.getFileInputStream());
+        try (HSSFWorkbook hssfWorkbook = new HSSFWorkbook(fileReader.getFileInputStream())){
+            return hssfWorkbook;
         }  catch (IOException e) {
             System.out.println(e.getMessage());
+            return null;
         }
-        return hssfWorkbook;
     }
 
 
@@ -63,7 +63,6 @@ public class XlsParser implements Parsable {
             Cell cell = cellIt.next();
             System.out.println(cell.toString() + ";");
         }
-        close();
     }
 
     private Iterator<Row> getRows(int numOfSheet){
@@ -76,25 +75,47 @@ public class XlsParser implements Parsable {
         return sheet.rowIterator();
     }
 
-    public void outputToJSON() {
+    public String outputToJSON() {
+        return parse();
+    }
+
+    private void skipPrevRows(Iterator iterator, int num) {
+        for (int i=0; i<num; i++)
+            iterator.next();
+    }
+
+    private String parse() {
         System.out.println("Parsing XLS file...");
 
         Iterator<Row> rowIt = getRows(0);
+        skipPrevRows(rowIt, 6);
+        JsonArray array = new JsonArray();
+
         while (rowIt.hasNext()) {
             Row row = rowIt.next();
-            Json json = new Json();
-            //store json node in array
+            Json rowObj = new Json();
+            Iterator<Cell> cellItr = row.cellIterator();
 
+            while (cellItr.hasNext()) {
+                Cell cell = cellItr.next();
+                switch (cell.getColumnIndex()) {
+                    case 0:
+                        rowObj.put("County", String.valueOf(cell.getStringCellValue()));
+                        break;
+                    case 1:
+                        rowObj.put("Votes1", String.valueOf(cell.getNumericCellValue()));
+                        break;
+                    case 2:
+                        rowObj.put("Votes2", String.valueOf(cell.getNumericCellValue()));
+                        break;
+                    case 3:
+                        rowObj.put("Votes3", String.valueOf(cell.getNumericCellValue()));
+                        break;
+                }
+            }
+            array.add(rowObj);
         }
-    }
-
-    public void close(){
-        try {
-            hssfWorkbook.close();
-            fileReader.close();
-        } catch (IOException e) {
-            System.out.println(e.getMessage());
-        }
+        return array.toJson();
     }
 
 }

@@ -9,8 +9,8 @@ public class Parser {
         this.parser = parser;
     }
 
-    public void extract(){
-        parser.outputToJSON();
+    public String extract(){
+        return parser.outputToJSON();
     }
 
     public String getPathToOutput() {
